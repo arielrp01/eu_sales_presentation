@@ -1,0 +1,190 @@
+/* ── Base slide ────────────────────────────────────────────────────────────── */
+slides > slide {
+  background: #FFFFFF;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.slideContent {
+  padding: 10px 36px 10px 36px;
+}
+
+/* Slide title bar */
+slide:not(.segue) > hgroup {
+  border-bottom: 2px solid #1B3A5C;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+
+slide:not(.segue) > hgroup h2 {
+  font-family: Georgia, serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1B2A3B;
+  line-height: 1.2;
+}
+
+/* ── Map + KPI slide ───────────────────────────────────────────────────────── */
+.map-container {
+  width: 100%;
+  height: 240px;
+  border: 1px solid #DDE1E7;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.map-container .leaflet {
+  height: 100% !important;
+}
+
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.kpi-card {
+  background: #FFFFFF;
+  border: 1px solid #DDE1E7;
+  border-top: 3px solid #1B3A5C;
+  padding: 10px 16px 10px 16px;
+  box-sizing: border-box;
+}
+
+.kpi-label {
+  font-family: Arial, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #5A6572;
+  margin-bottom: 4px;
+}
+
+.kpi-value {
+  font-family: Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1B2A3B;
+  line-height: 1;
+}
+
+/* ── Chart slides ──────────────────────────────────────────────────────────── */
+.chart-slide .slideContent {
+  padding-top: 4px;
+}
+
+/* Ensure plotly fills width */
+.chart-slide .plotly {
+  width: 100% !important;
+}
+
+/* ── ioslides overrides ────────────────────────────────────────────────────── */
+slides > slide.backdrop {
+  background: #F2F4F6;
+}
+
+/* Hide default ioslides footer elements */
+.presenter-name,
+.source-name-cont {
+  display: none;
+}
+
+/* ── Agenda / Key Findings slide ───────────────────────────────────────────── */
+.agenda-slide .slideContent {
+  padding: 10px 36px;
+}
+
+.agenda-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.agenda-item {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 16px;
+  border: 1px solid #DDE1E7;
+  border-left: 4px solid #1B3A5C;
+  background: #FFFFFF;
+}
+
+.agenda-num {
+  font-family: Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #DDE1E7;
+  min-width: 32px;
+  line-height: 1;
+}
+
+.agenda-title {
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1B2A3B;
+  margin-bottom: 2px;
+}
+
+.agenda-desc {
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  color: #5A6572;
+}
+
+/* ── Cover slide ───────────────────────────────────────────────────────────── */
+.cover-slide {
+  background: #FFFFFF !important;
+}
+
+.cover-block {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  width: 75%;
+}
+
+.cover-rule-top {
+  width: 40px;
+  height: 2px;
+  background: #1B3A5C;
+  margin: 0 auto 16px auto;
+}
+
+.cover-label {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #5A6572;
+  margin-bottom: 14px;
+}
+
+.cover-title {
+  font-family: Georgia, serif;
+  font-size: 38px;
+  font-weight: 700;
+  color: #1B2A3B;
+  line-height: 1.15;
+  margin-bottom: 14px;
+}
+
+.cover-rule-bottom {
+  width: 40px;
+  height: 3px;
+  background: #B07D2E;
+  margin: 0 auto 14px auto;
+}
+
+.cover-sub {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  color: #5A6572;
+  letter-spacing: 0.04em;
+}
