@@ -1,0 +1,801 @@
+
+---
+title: "Week 3 Assignment"
+subtitle: "R Markdown Presentation with Plotly"
+author: "A. Richmond-Parks"
+date: "June 7, 2026"
+output:
+  ioslides_presentation:
+    widescreen: false
+    smaller: false
+    css: eu_slides.css
+    self_contained: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.align = "center")
+
+pkgs <- c("tidyverse", "lubridate", "janitor", "googlesheets4",
+          "plotly", "scales", "leaflet", "sf", "rnaturalearth",
+          "rnaturalearthdata", "htmltools")
+installed <- rownames(installed.packages())
+to_install <- pkgs[!pkgs %in% installed]
+if (length(to_install)) install.packages(to_install, repos = "https://cloud.r-project.org", quiet = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(janitor)
+library(googlesheets4)
+library(plotly)
+library(scales)
+library(leaflet)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(htmltools)
+```
+
+```{r load-data, cache=TRUE}
+sheet_url <- "https://docs.google.com/spreadsheets/d/1tU79rOh-fBCo6mKniF7kg56JVzGowrbxGee5nIMMkiA/edit?usp=sharing"
+gs4_deauth()
+
+parse_order_date <- function(x) {
+  if (inherits(x, "Date")) return(x)
+  if (inherits(x, "POSIXt")) return(as.Date(x))
+  lubridate::mdy(as.character(x))
+}
+
+orders <- read_sheet(sheet_url) %>%
+  clean_names() %>%
+  mutate(
+    order_date = parse_order_date(order_date),
+    sales      = as.numeric(sales),
+    profit     = as.numeric(profit),
+    year       = year(order_date),
+    month_num  = month(order_date),
+    month_name = factor(month.abb[month_num], levels = month.abb)
+  )
+```
+
+```{r data-prep}
+months_tbl <- tibble(month_num = 1:12,
+                     month_name = factor(month.abb, levels = month.abb))
+
+make_monthly <- function(yr) {
+  orders %>%
+    filter(year == yr) %>%
+    group_by(month_num) %>%
+    summarise(sales  = sum(sales,  na.rm = TRUE),
+              profit = sum(profit, na.rm = TRUE),
+              .groups = "drop") %>%
+    right_join(months_tbl, by = "month_num") %>%
+    arrange(month_num) %>%
+    mutate(across(c(sales, profit), ~replace_na(., 0)))
+}
+
+monthly22 <- make_monthly(2022)
+monthly21 <- make_monthly(2021)
+
+dash22 <- orders %>% filter(year == 2022)
+
+kpis <- dash22 %>%
+  summarise(sales     = sum(sales,  na.rm = TRUE),
+            profit    = sum(profit, na.rm = TRUE),
+            customers = n_distinct(customer_id))
+
+product_sales <- dash22 %>%
+  group_by(sub_category) %>%
+  summarise(sales = sum(sales, na.rm = TRUE), .groups = "drop") %>%
+  arrange(sales) %>%
+  mutate(sub_category = factor(sub_category, levels = sub_category))
+
+country_sales <- dash22 %>%
+  group_by(country_region) %>%
+  summarise(sales  = sum(sales,  na.rm = TRUE),
+            profit = sum(profit, na.rm = TRUE),
+            .groups = "drop")
+```
+
+```{r design-tokens}
+navy   <- "#1B3A5C"
+gold   <- "#B07D2E"
+grey21_sales  <- "#9AAFC7"
+grey21_profit <- "#C8B48A"
+bg_col <- "#F2F4F6"
+label_col <- "#5A6572"
+title_col <- "#1B2A3B"
+num_font  <- "Arial, Helvetica, sans-serif"
+
+fmt_k <- function(x) ifelse(x >= 1000, paste0(round(x/1000, 0), "k"), as.character(round(x, 0)))
+
+rcfg <- function(p) config(p, displayModeBar = FALSE, displaylogo = FALSE, responsive = TRUE)
+```
+
+## {.cover-slide}
+
+```{r cover-slide, results='asis'}
+HTML('
+<div class="cover-block">
+  <div class="cover-rule-top"></div>
+  <div class="cover-label">EUROPEAN REGION &nbsp;&middot;&nbsp; FISCAL YEAR 2022</div>
+  <div class="cover-title">EU Sales Review</div>
+  <div class="cover-rule-bottom"></div>
+  <div class="cover-sub">Performance Analysis &nbsp;&middot;&nbsp; Annual Report</div>
+</div>
+')
+```
+
+## Key Findings {.agenda-slide}
+
+```{r key-findings, results='asis'}
+HTML('
+<div class="agenda-block">
+  <div class="agenda-item">
+    <span class="agenda-num">01</span>
+    <div class="agenda-text">
+      <div class="agenda-title">Market Overview</div>
+      <div class="agenda-desc">Sales by country, KPIs, and top 5 markets by revenue</div>
+    </div>
+  </div>
+  <div class="agenda-item">
+    <span class="agenda-num">02</span>
+    <div class="agenda-text">
+      <div class="agenda-title">Country YoY Performance</div>
+      <div class="agenda-desc">Geographic sales change 2021 vs 2022 by country</div>
+    </div>
+  </div>
+  <div class="agenda-item">
+    <span class="agenda-num">03</span>
+    <div class="agenda-text">
+      <div class="agenda-title">YoY Sales &amp; Revenue Trend</div>
+      <div class="agenda-desc">Monthly 2021 vs 2022 comparison with percentage change</div>
+    </div>
+  </div>
+  <div class="agenda-item">
+    <span class="agenda-num">04</span>
+    <div class="agenda-text">
+      <div class="agenda-title">Top Revenue Categories</div>
+      <div class="agenda-desc">Category breakdown with YoY percentage change</div>
+    </div>
+  </div>
+  <div class="agenda-item">
+    <span class="agenda-num">05</span>
+    <div class="agenda-text">
+      <div class="agenda-title">Profitability Snapshot</div>
+      <div class="agenda-desc">Overall profit margin % and year-over-year change</div>
+    </div>
+  </div>
+  <div class="agenda-item">
+    <span class="agenda-num">06</span>
+    <div class="agenda-text">
+      <div class="agenda-title">Customer Base</div>
+      <div class="agenda-desc">Total customers and YoY change in customer count</div>
+    </div>
+  </div>
+</div>
+')
+```
+
+## Market Overview {.map-kpi-slide}
+
+```{r map-kpi-slide}
+# ── Leaflet choropleth ────────────────────────────────────────────────────────
+world_sf <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Join on sovereignt — avoids France overseas territory rows that share name="France"
+# but have different sovereignt, causing the wrong polygon to get coloured.
+# Normalise sheet names → sovereignt values used by rnaturalearth.
+country_sales_map <- country_sales %>%
+  mutate(sovereignt = case_when(
+    country_region == "United Kingdom" ~ "United Kingdom",
+    country_region == "Netherlands"    ~ "Netherlands",
+    TRUE                               ~ country_region
+  ))
+
+# Restrict to Europe; join sales onto sovereignt field
+europe_sf <- world_sf %>%
+  filter(continent == "Europe" | sovereignt %in% c("Turkey", "Cyprus")) %>%
+  left_join(country_sales_map, by = "sovereignt")
+
+# Fill: white = 0 sales, navy = 300k sales
+# No-data countries get a clear flat grey — visually separate from the white end of the scale
+pal_fill <- colorNumeric(
+  palette  = c("white", "#5B8DB8", navy),
+  domain   = c(0, 325000),   # ceiling above France's 308k+ so it maps to full navy
+  na.color = "#B0B8C1"
+)
+
+pal_legend <- colorNumeric(
+  palette = c("white", "#5B8DB8", navy),
+  domain  = c(0, 325000),
+  reverse = TRUE
+)
+
+country_map_leaf <- leaflet(europe_sf,
+    options = leafletOptions(zoomControl = FALSE, attributionControl = FALSE)) %>%
+  setView(lng = 10, lat = 52, zoom = 3) %>%
+  addPolygons(
+    fillColor    = ~pal_fill(sales),
+    fillOpacity  = 0.9,
+    color        = "transparent",
+    weight       = 0,
+    smoothFactor = 0.8,
+    label = ~ifelse(!is.na(sales),
+      paste0("<b>", name, "</b><br>Sales: ", scales::comma(round(sales, 0))),
+      name) %>% lapply(htmltools::HTML),
+    labelOptions = labelOptions(style = list("font-size" = "11px"))
+  ) %>%
+  # Static labels — navy at top = 300,000; white at bottom = 0
+  # Using addLegend with explicit labels vector avoids any transform arithmetic
+  addControl(
+    html = paste0(
+      '<div style="',
+        'background:white; padding:8px 10px; border-radius:3px;',
+        'font-family:Arial,sans-serif; font-size:11px; color:#5A6572;',
+        'box-shadow:0 1px 4px rgba(0,0,0,0.2);',
+      '">',
+      '<div style="font-weight:700; margin-bottom:4px;">Sales</div>',
+      '<div style="display:flex; align-items:stretch; gap:6px;">',
+        '<div style="',
+          'width:12px; height:80px;',
+          'background: linear-gradient(to bottom, ', navy, ', #5B8DB8, white);',
+        '"></div>',
+        '<div style="display:flex; flex-direction:column; justify-content:space-between;">',
+          '<span>300,000</span>',
+          '<span>150,000</span>',
+          '<span>0</span>',
+        '</div>',
+      '</div>',
+      '</div>'
+    ),
+    position = "bottomright"
+  )
+
+# ── KPI strip (HTML) ──────────────────────────────────────────────────────────
+kpi_block <- function(label, value) {
+  tags$div(class = "kpi-card",
+    tags$div(class = "kpi-label", label),
+    tags$div(class = "kpi-value", scales::comma(round(value, 0)))
+  )
+}
+
+kpi_strip <- tags$div(class = "kpi-strip",
+  kpi_block("Total Sales",  kpis$sales),
+  kpi_block("Total Profit", kpis$profit),
+  kpi_block("Customers",    kpis$customers)
+)
+
+# ── Top 5 countries table ─────────────────────────────────────────────────────
+top5 <- country_sales %>%
+  arrange(desc(sales)) %>%
+  slice(1:5) %>%
+  mutate(rank = row_number(), sales_fmt = paste0("$", scales::comma(round(sales, 0))))
+
+top5_rows <- lapply(1:nrow(top5), function(i) {
+  tags$tr(
+    tags$td(style = "padding:4px 10px; color:#5A6572; font-size:10px;",
+            paste0("#", top5$rank[i])),
+    tags$td(style = "padding:4px 10px; font-weight:600; font-size:10px;",
+            top5$country_region[i]),
+    tags$td(style = paste0("padding:4px 10px; font-size:10px;",
+                           "color:#1B3A5C; font-weight:700; text-align:right;"),
+            top5$sales_fmt[i])
+  )
+})
+
+top5_table <- tags$div(
+  style = paste0(
+    "margin-top:10px;",
+    "border:1px solid #DDE1E7;",
+    "background:#FFFFFF;",
+    "box-sizing:border-box;"
+  ),
+  tags$div(
+    style = paste0(
+      "padding:6px 10px;",
+      "border-bottom:2px solid #1B3A5C;",
+      "font-family:Arial,sans-serif;",
+      "font-size:9px; font-weight:700;",
+      "letter-spacing:0.10em; text-transform:uppercase;",
+      "color:#5A6572;"
+    ),
+    "Top 5 Countries by Sales"
+  ),
+  tags$table(
+    style = "width:100%; border-collapse:collapse; font-family:Arial,sans-serif;",
+    do.call(tagList, top5_rows)
+  )
+)
+
+# Render map + KPI strip + top 5 table
+tagList(
+  tags$div(class = "map-container", country_map_leaf),
+  kpi_strip,
+  top5_table
+)
+```
+
+## Country YoY Sales Change {.chart-slide}
+
+```{r yoy-map-slide}
+# Country-level YoY % change 2021 vs 2022
+country_sales21 <- orders %>%
+  filter(year == 2021) %>%
+  group_by(country_region) %>%
+  summarise(sales21 = sum(sales, na.rm = TRUE), .groups = "drop")
+
+country_yoy <- country_sales %>%
+  left_join(country_sales21, by = "country_region") %>%
+  mutate(
+    sales21  = replace_na(sales21, 0),
+    yoy_pct  = ifelse(sales21 == 0, NA,
+                 round((sales - sales21) / sales21 * 100, 1)),
+    yoy_fmt  = ifelse(is.na(yoy_pct), "No 2021 data",
+                 ifelse(yoy_pct >= 0,
+                   paste0("+", yoy_pct, "%"),
+                   paste0(yoy_pct, "%"))),
+    sovereignt = case_when(
+      country_region == "United Kingdom" ~ "United Kingdom",
+      country_region == "Netherlands"    ~ "Netherlands",
+      TRUE ~ country_region
+    )
+  )
+
+europe_yoy_sf <- world_sf %>%
+  filter(continent == "Europe" | sovereignt %in% c("Turkey", "Cyprus")) %>%
+  left_join(country_yoy, by = "sovereignt")
+
+# Diverging palette: red = decline, white = flat, navy = growth
+pal_yoy <- colorNumeric(
+  palette  = c("#C0392B", "white", navy),
+  domain   = c(-100, 100),
+  na.color = "#B0B8C1"
+)
+
+leaflet(europe_yoy_sf,
+    options = leafletOptions(zoomControl = FALSE, attributionControl = FALSE)) %>%
+  setView(lng = 10, lat = 52, zoom = 3) %>%
+  addPolygons(
+    fillColor    = ~pal_yoy(yoy_pct),
+    fillOpacity  = 0.85,
+    color        = "transparent",
+    weight       = 0,
+    smoothFactor = 0.8,
+    label = ~ifelse(!is.na(yoy_pct),
+      paste0("<b>", name, "</b><br>YoY Change: ", yoy_fmt,
+             "<br>2022: $", scales::comma(round(sales, 0)),
+             "<br>2021: $", scales::comma(round(sales21, 0))),
+      paste0("<b>", name, "</b><br>No data")) %>%
+      lapply(htmltools::HTML),
+    labelOptions = labelOptions(style = list("font-size" = "11px"))
+  ) %>%
+  addControl(
+    html = paste0(
+      '<div style="background:white; padding:8px 10px; border-radius:3px;',
+        'font-family:Arial,sans-serif; font-size:11px; color:#5A6572;',
+        'box-shadow:0 1px 4px rgba(0,0,0,0.2);">',
+      '<div style="font-weight:700; margin-bottom:4px;">YoY Change</div>',
+      '<div style="display:flex; align-items:stretch; gap:6px;">',
+        '<div style="width:12px; height:80px;',
+          'background:linear-gradient(to bottom,', navy, ', white,', '#C0392B', ');"></div>',
+        '<div style="display:flex; flex-direction:column; justify-content:space-between;">',
+          '<span>+100%</span><span>0%</span><span>-100%</span>',
+        '</div>',
+      '</div></div>'
+    ),
+    position = "bottomright"
+  )
+```
+
+## Sales & Profit Trend {.chart-slide}
+
+```{r trend-slide, fig.height=4.2, out.width="100%"}
+# Offset x positions ±0.15 so overlapping year markers are both visible.
+# customdata: col 1 = month name, col 2 = YoY % change vs same month 2021
+monthly21_plot <- monthly21 %>%
+  mutate(x_off = month_num - 0.15, mon = as.character(month_name))
+
+monthly22_plot <- monthly22 %>%
+  mutate(x_off     = month_num + 0.15,
+         mon       = as.character(month_name),
+         sales_pct = ifelse(monthly21$sales == 0, NA,
+                      round((sales - monthly21$sales) / monthly21$sales * 100, 1)),
+         profit_pct = ifelse(monthly21$profit == 0, NA,
+                      round((profit - monthly21$profit) / monthly21$profit * 100, 1)),
+         # Format as "+x%" or "-x%" for the hover label
+         sales_pct_fmt  = ifelse(is.na(sales_pct),  "n/a",
+                           ifelse(sales_pct  >= 0,
+                             paste0("+", sales_pct,  "%"),
+                             paste0(sales_pct,  "%"))),
+         profit_pct_fmt = ifelse(is.na(profit_pct), "n/a",
+                           ifelse(profit_pct >= 0,
+                             paste0("+", profit_pct, "%"),
+                             paste0(profit_pct, "%"))),
+         # Bundle into customdata as list-column matrices so %{customdata[0]} and [1] work
+         sales_cd  = purrr::map2(mon, sales_pct_fmt,  ~c(.x, .y)),
+         profit_cd = purrr::map2(mon, profit_pct_fmt, ~c(.x, .y)))
+
+trend_chart <- plot_ly() %>%
+  add_trace(
+    data = monthly21_plot, x = ~x_off, y = ~sales,
+    customdata = ~mon,
+    name = "Sales 2021", type = "scatter", mode = "lines+markers",
+    line   = list(color = grey21_sales, width = 1.5),
+    marker = list(color = "white", size = 6, symbol = "circle",
+                  line = list(color = grey21_sales, width = 1.5)),
+    hovertemplate = "%{customdata} 2021: $%{y:,.0f}<extra></extra>"
+  ) %>%
+  add_trace(
+    data = monthly21_plot, x = ~x_off, y = ~profit,
+    customdata = ~mon,
+    name = "Profit 2021", type = "scatter", mode = "lines+markers",
+    line   = list(color = grey21_profit, width = 1.5, dash = "dot"),
+    marker = list(color = "white", size = 6, symbol = "diamond",
+                  line = list(color = grey21_profit, width = 1.5)),
+    hovertemplate = "%{customdata} 2021: $%{y:,.0f}<extra></extra>"
+  ) %>%
+  # 2022 Sales — customdata = "Jan||+12.3%" parsed in hovertemplate
+  add_trace(
+    data = monthly22_plot, x = ~x_off, y = ~sales,
+    customdata = ~sales_cd,
+    name = "Sales 2022", type = "scatter", mode = "lines+markers",
+    line       = list(color = navy, width = 2.5),
+    marker     = list(color = navy, size = 7),
+    showlegend = TRUE,
+    # customdata = "Jan||+12.3%" — split on || so [0]=month, [1]=pct
+    hovertemplate = "%{customdata[0]} 2022: $%{y:,.0f}, %{customdata[1]}<extra></extra>"
+  ) %>%
+  # 2022 Profit
+  add_trace(
+    data = monthly22_plot, x = ~x_off, y = ~profit,
+    customdata = ~profit_cd,
+    name = "Profit 2022", type = "scatter", mode = "lines+markers",
+    line       = list(color = gold, width = 2.5, dash = "dot"),
+    marker     = list(color = gold, size = 7, symbol = "diamond"),
+    showlegend = TRUE,
+    hovertemplate = "%{customdata[0]} 2022: $%{y:,.0f}, %{customdata[1]}<extra></extra>"
+  ) %>%
+  layout(
+    autosize = TRUE,
+    xaxis = list(
+      title = "", tickmode = "array",
+      tickvals = 1:12, ticktext = month.abb,
+      showgrid = FALSE, zeroline = FALSE,
+      tickfont = list(size = 11)
+    ),
+    yaxis = list(
+      title = "", tickformat = "~s", rangemode = "tozero",
+      gridcolor = "#DDE1E7", zeroline = FALSE,
+      tickfont = list(size = 11)
+    ),
+    legend = list(
+      orientation = "h", x = 0, y = 1.14,
+      font = list(size = 10), bgcolor = "rgba(0,0,0,0)"
+    ),
+    # Peak annotation — find month with highest 2022 sales automatically
+    annotations = list(
+      list(
+        x          = monthly22_plot$x_off[which.max(monthly22_plot$sales)],
+        y          = max(monthly22_plot$sales),
+        text       = paste0("<b>Peak: $",
+                      scales::comma(round(max(monthly22_plot$sales), 0)), "</b>"),
+        showarrow  = TRUE,
+        arrowhead  = 2,
+        arrowcolor = navy,
+        ax         = 0, ay = -36,
+        font       = list(size = 10, color = navy),
+        bgcolor    = "rgba(255,255,255,0.85)",
+        bordercolor = navy,
+        borderwidth = 1
+      )
+    ),
+    margin        = list(l = 50, r = 20, t = 40, b = 40),
+    paper_bgcolor = "white",
+    plot_bgcolor  = "white",
+    font = list(family = num_font, color = label_col)
+  ) %>%
+  rcfg()
+
+trend_chart
+```
+
+## Revenue by Category {.chart-slide}
+
+```{r product-slide, fig.height=4.8, out.width="100%"}
+# 2021 product sales for comparison
+product_sales21 <- orders %>%
+  filter(year == 2021) %>%
+  group_by(sub_category) %>%
+  summarise(sales = sum(sales, na.rm = TRUE), .groups = "drop")
+
+# Join so both years share the same category order (driven by 2022 rank)
+product_both <- product_sales %>%
+  rename(sales22 = sales) %>%
+  left_join(product_sales21 %>% rename(sales21 = sales), by = "sub_category") %>%
+  mutate(sales21 = replace_na(sales21, 0))
+
+# Hover label appears to the right: use hoverinfo + hoverlabel
+product_bar <- plot_ly() %>%
+  # 2021 bars — grey, inside labels
+  add_bars(
+    data        = product_both,
+    x           = ~sales21, y = ~sub_category,
+    name        = "2021",
+    orientation = "h",
+    marker      = list(color = grey21_sales,
+                       line  = list(color = "white", width = 0.5)),
+    text        = "",
+    textposition = "none",
+    hovertemplate = "<b>%{y}</b><br>2021: $%{x:,.0f}<extra></extra>",
+    hoverlabel  = list(bgcolor = grey21_sales, font = list(color = "white", size = 11),
+                       align = "left")
+  ) %>%
+  # 2022 bars — navy, inside labels
+  add_bars(
+    data        = product_both,
+    x           = ~sales22, y = ~sub_category,
+    name        = "2022",
+    orientation = "h",
+    marker      = list(color = navy,
+                       line  = list(color = "white", width = 0.5)),
+    text        = "",
+    textposition = "none",
+    hovertemplate = "<b>%{y}</b><br>2022: $%{x:,.0f}<extra></extra>",
+    hoverlabel  = list(bgcolor = navy, font = list(color = "white", size = 11),
+                       align = "left")
+  ) %>%
+  layout(
+    autosize = TRUE,
+    barmode  = "group",    # side-by-side 2021 vs 2022
+    xaxis = list(
+      title = "", tickformat = "~s",
+      showgrid = FALSE, zeroline = FALSE,
+      tickfont = list(size = 11)
+    ),
+    yaxis = list(
+      title = "",
+      categoryorder = "array",
+      categoryarray = as.character(product_both$sub_category),
+      tickfont = list(size = 10)
+    ),
+    legend = list(
+      orientation = "h", x = 0, y = 1.06,
+      font = list(size = 10), bgcolor = "rgba(0,0,0,0)"
+    ),
+    hoverlabel = list(namelength = -1),
+    margin        = list(l = 100, r = 20, t = 35, b = 40),
+    paper_bgcolor = "white",
+    plot_bgcolor  = "white",
+    font = list(family = num_font, color = label_col)
+  ) %>%
+  rcfg()
+
+product_bar
+```
+
+## Top 5 Categories - YoY Change {.chart-slide}
+
+```{r top5-cat-slide, fig.height=4.2, out.width="100%"}
+# Top 5 categories by 2022 sales, with YoY % change
+top5_cat <- product_both %>%
+  mutate(custom_order = case_when(
+    sub_category == "Copiers"    ~ 1,
+    sub_category == "Bookcases"  ~ 2,
+    sub_category == "Phones"     ~ 3,
+    sub_category == "Storage"    ~ 4,
+    sub_category == "Appliances" ~ 5,
+    TRUE ~ 99
+  )) %>%
+  filter(custom_order < 99) %>%
+  arrange(custom_order) %>%
+  mutate(
+    pct_change   = round((sales22 - sales21) / sales21 * 100, 1),
+    pct_fmt      = ifelse(pct_change >= 0,
+                     paste0("+", pct_change, "%"),
+                     paste0(pct_change, "%")),
+    bar_col      = ifelse(pct_change >= 0, navy, "#C0392B"),
+    sub_category = factor(sub_category,
+                     levels = c("Appliances", "Storage", "Phones", "Bookcases", "Copiers"))
+  )
+
+top5_cat_bar <- plot_ly(top5_cat) %>%
+  # 2021 bars — grey
+  add_bars(
+    x = ~sales21, y = ~sub_category,
+    name = "2021", orientation = "h",
+    marker = list(color = grey21_sales),
+    hovertemplate = "<b>%{y}</b><br>2021: $%{x:,.0f}<extra></extra>"
+  ) %>%
+  # 2022 bars — navy or red depending on growth
+  add_bars(
+    x = ~sales22, y = ~sub_category,
+    name = "2022", orientation = "h",
+    marker = list(color = ~bar_col),
+    text   = ~pct_fmt,
+    textposition = "outside",
+    textfont = list(size = 11, color = ~bar_col),
+    cliponaxis = FALSE,
+    hovertemplate = "<b>%{y}</b><br>2022: $%{x:,.0f}<extra></extra>"
+  ) %>%
+  layout(
+    autosize = TRUE,
+    barmode  = "group",
+    xaxis = list(
+      title = "", tickformat = "~s",
+      showgrid = FALSE, zeroline = FALSE,
+      tickfont = list(size = 11)
+    ),
+    yaxis = list(
+      title = "",
+      categoryorder = "array",
+      categoryarray = c("Appliances", "Storage", "Phones", "Bookcases", "Copiers"),
+      tickfont = list(size = 11)
+    ),
+    legend = list(
+      orientation = "h", x = 0, y = 1.08,
+      font = list(size = 10), bgcolor = "rgba(0,0,0,0)"
+    ),
+    margin        = list(l = 100, r = 70, t = 35, b = 40),
+    paper_bgcolor = "white",
+    plot_bgcolor  = "white",
+    font = list(family = num_font, color = label_col)
+  ) %>%
+  rcfg()
+
+top5_cat_bar
+```
+
+## Profitability Snapshot {.chart-slide}
+
+```{r profitability-slide, results='asis'}
+# Overall margins
+margin22 <- round(kpis$profit / kpis$sales * 100, 1)
+
+profit21 <- orders %>%
+  filter(year == 2021) %>%
+  summarise(sales = sum(sales, na.rm = TRUE), profit = sum(profit, na.rm = TRUE))
+margin21 <- round(profit21$profit / profit21$sales * 100, 1)
+
+margin_chg    <- round(margin22 - margin21, 1)
+margin_chg_fmt <- ifelse(margin_chg >= 0, paste0("+", margin_chg, "pp"), paste0(margin_chg, "pp"))
+
+profit_chg_pct <- round((kpis$profit - profit21$profit) / profit21$profit * 100, 1)
+profit_chg_fmt <- ifelse(profit_chg_pct >= 0, paste0("+", profit_chg_pct, "%"), paste0(profit_chg_pct, "%"))
+
+card_col <- function(val) ifelse(val >= 0, navy, "#C0392B")
+
+HTML(paste0('
+<div style="display:grid; grid-template-columns: repeat(3,1fr); gap:16px; margin-top:20px;">
+
+  <div style="border:1px solid #DDE1E7; border-top:3px solid ', navy, '; padding:20px 24px; font-family:Arial,sans-serif;">
+    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#5A6572; margin-bottom:8px;">Profit Margin 2022</div>
+    <div style="font-size:36px; font-weight:700; color:#1B2A3B; line-height:1;">',  margin22, '%</div>
+  </div>
+
+  <div style="border:1px solid #DDE1E7; border-top:3px solid ', navy, '; padding:20px 24px; font-family:Arial,sans-serif;">
+    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#5A6572; margin-bottom:8px;">Profit Margin 2021</div>
+    <div style="font-size:36px; font-weight:700; color:#1B2A3B; line-height:1;">',  margin21, '%</div>
+  </div>
+
+  <div style="border:1px solid #DDE1E7; border-top:3px solid ', card_col(margin_chg), '; padding:20px 24px; font-family:Arial,sans-serif;">
+    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#5A6572; margin-bottom:8px;">Margin Change (pp)</div>
+    <div style="font-size:36px; font-weight:700; color:', card_col(margin_chg), '; line-height:1;">', margin_chg_fmt, '</div>
+  </div>
+
+</div>
+
+<div style="display:grid; grid-template-columns: repeat(2,1fr); gap:16px; margin-top:16px;">
+
+  <div style="border:1px solid #DDE1E7; border-top:3px solid ', navy, '; padding:20px 24px; font-family:Arial,sans-serif;">
+    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#5A6572; margin-bottom:8px;">Total Profit 2022</div>
+    <div style="font-size:36px; font-weight:700; color:#1B2A3B; line-height:1;">$', scales::comma(round(kpis$profit, 0)), '</div>
+  </div>
+
+  <div style="border:1px solid #DDE1E7; border-top:3px solid ', card_col(profit_chg_pct), '; padding:20px 24px; font-family:Arial,sans-serif;">
+    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#5A6572; margin-bottom:8px;">YoY Profit Change</div>
+    <div style="font-size:36px; font-weight:700; color:', card_col(profit_chg_pct), '; line-height:1;">', profit_chg_fmt, '</div>
+  </div>
+
+</div>
+'))
+```
+
+## Customer Base {.chart-slide}
+
+```{r customer-slide, results='asis'}
+customers21 <- orders %>%
+  filter(year == 2021) %>%
+  summarise(customers = n_distinct(customer_id)) %>%
+  pull(customers)
+
+cust_chg     <- kpis$customers - customers21
+cust_chg_pct <- round(cust_chg / customers21 * 100, 1)
+cust_chg_fmt <- ifelse(cust_chg_pct >= 0, paste0("+", cust_chg_pct, "%"), paste0(cust_chg_pct, "%"))
+
+card_col <- function(val) ifelse(val >= 0, navy, "#C0392B")
+
+HTML(paste0('
+<div style="display:grid; grid-template-columns: repeat(3,1fr); gap:16px; margin-top:20px;">
+
+  <div style="border:1px solid #DDE1E7; border-top:3px solid ', navy, '; padding:20px 24px; font-family:Arial,sans-serif;">
+    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#5A6572; margin-bottom:8px;">Customers 2022</div>
+    <div style="font-size:36px; font-weight:700; color:#1B2A3B; line-height:1;">', scales::comma(kpis$customers), '</div>
+  </div>
+
+  <div style="border:1px solid #DDE1E7; border-top:3px solid ', navy, '; padding:20px 24px; font-family:Arial,sans-serif;">
+    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#5A6572; margin-bottom:8px;">Customers 2021</div>
+    <div style="font-size:36px; font-weight:700; color:#1B2A3B; line-height:1;">', scales::comma(customers21), '</div>
+  </div>
+
+  <div style="border:1px solid #DDE1E7; border-top:3px solid ', card_col(cust_chg_pct), '; padding:20px 24px; font-family:Arial,sans-serif;">
+    <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#5A6572; margin-bottom:8px;">YoY Change</div>
+    <div style="font-size:36px; font-weight:700; color:', card_col(cust_chg_pct), '; line-height:1;">', cust_chg_fmt, '</div>
+  </div>
+
+</div>
+
+<div style="margin-top:16px; border:1px solid #DDE1E7; border-top:3px solid ', navy, '; padding:20px 24px; font-family:Arial,sans-serif;">
+  <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#5A6572; margin-bottom:8px;">Net New Customers</div>
+  <div style="font-size:36px; font-weight:700; color:', card_col(cust_chg), '; line-height:1;">',
+    ifelse(cust_chg >= 0, paste0("+", scales::comma(cust_chg)), scales::comma(cust_chg)),
+  '</div>
+</div>
+'))
+```
+
+## Key Takeaways {.agenda-slide}
+
+```{r takeaways-slide, results='asis'}
+# Auto-derive insights from data
+top_country    <- country_sales %>% arrange(desc(sales)) %>% slice(1)
+top_country_share <- round(top_country$sales / kpis$sales * 100, 1)
+
+top_cat22      <- product_both %>% arrange(desc(sales22)) %>% slice(1)
+top_cat_pct    <- round((top_cat22$sales22 - top_cat22$sales21) / top_cat22$sales21 * 100, 1)
+top_cat_fmt    <- ifelse(top_cat_pct >= 0, paste0("+", top_cat_pct, "%"), paste0(top_cat_pct, "%"))
+
+sales21_total  <- orders %>% filter(year == 2021) %>% summarise(s = sum(sales, na.rm = TRUE)) %>% pull(s)
+total_sales_pct <- round((kpis$sales - sales21_total) / sales21_total * 100, 1)
+total_sales_fmt <- ifelse(total_sales_pct >= 0, paste0("+", total_sales_pct, "%"), paste0(total_sales_pct, "%"))
+
+margin22_val   <- round(kpis$profit / kpis$sales * 100, 1)
+margin21_val   <- round(profit21$profit / profit21$sales * 100, 1)
+margin_dir     <- ifelse(margin22_val >= margin21_val, "improved", "declined")
+
+customers21_n  <- orders %>% filter(year == 2021) %>% summarise(n = n_distinct(customer_id)) %>% pull(n)
+cust_pct       <- round((kpis$customers - customers21_n) / customers21_n * 100, 1)
+cust_fmt       <- ifelse(cust_pct >= 0, paste0("+", cust_pct, "%"), paste0(cust_pct, "%"))
+
+peak_month     <- monthly22 %>% slice(which.max(sales)) %>% pull(month_num) %>% month(label = TRUE, abbr = FALSE) %>% as.character()
+
+insights <- list(
+  paste0("<b>", top_country$country_region, "</b> is the top market, representing ",
+         top_country_share, "% of total 2022 EU revenue ($",
+         scales::comma(round(top_country$sales, 0)), ")."),
+  paste0("Total EU sales ", total_sales_fmt, " YoY, reaching $",
+         scales::comma(round(kpis$sales, 0)), " in 2022."),
+  paste0("<b>", top_cat22$sub_category, "</b> led all categories with $",
+         scales::comma(round(top_cat22$sales22, 0)), " in sales (", top_cat_fmt, " YoY)."),
+  paste0("Profit margin ", margin_dir, " from ", margin21_val, "% in 2021 to ",
+         margin22_val, "% in 2022."),
+  paste0("Customer base grew ", cust_fmt, " YoY to ", scales::comma(kpis$customers),
+         " customers. Sales peaked in <b>", peak_month, "</b>.")
+)
+
+rows <- paste0(
+  mapply(function(txt, num) {
+    paste0(
+      '<div class="agenda-item">',
+        '<span class="agenda-num">', sprintf("%02d", num), '</span>',
+        '<div class="agenda-text">',
+          '<div class="agenda-desc" style="font-size:12px; color:#1B2A3B;">', txt, '</div>',
+        '</div>',
+      '</div>'
+    )
+  }, insights, seq_along(insights)),
+  collapse = ""
+)
+
+HTML(paste0('<div class="agenda-block">', rows, '</div>'))
+```
