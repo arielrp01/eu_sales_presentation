@@ -1,14 +1,16 @@
 # EU Sales Presentation
 
-An end-to-end interactive data presentation built in R, analyzing EU sales data across five dimensions: geographic market performance, year-over-year trends, category revenue, profitability, and customer growth. Built with live data ingestion, interactive maps, and Plotly charts and deployed as a self-contained HTML deck. 
+An end-to-end interactive data presentation built in R, analyzing EU sales data across five dimensions: geographic market performance, year-over-year trends, category revenue, profitability, and customer growth. 
+
+- Built with live data ingestion via Google Sheets, interactive maps, and Plotly charts.
+- Deployed as a self-contained HTML deck.
+- All metrics are calculated dynamically from the source data at render time.
 
 ---
 
 ## Data 
 
-[EU Superstore dataset](https://public.tableau.com/app/sample-data/sample_-_superstore.xls) via Tableau
-
-This presentation accesses the data via a public Google Sheet for live data ingestion. The dataset covers European regional sales transactions including order date, country, product sub-category, sales, and profit. All metrics are calculated dynamically from the source data at render time.
+Tableau | [EU Superstore dataset](https://public.tableau.com/app/sample-data/sample_-_superstore.xls)
 
 ---
 
@@ -31,4 +33,4 @@ This presentation accesses the data via a public Google Sheet for live data inge
 - [rnaturalearth](https://docs.ropensci.org/rnaturalearth/) 
 - [sf](https://r-spatial.github.io/sf/) 
 - [scales](https://scales.r-lib.org/) 
-- [EU Superstore dataset](https://public.tableau.com/app/sample-data/sample_-_superstore.xls) via Tableau
+- Tableau | [EU Superstore dataset](https://public.tableau.com/app/sample-data/sample_-_superstore.xls) 
