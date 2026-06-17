@@ -6,6 +6,8 @@ An end-to-end interactive presentation analyzing EU sales data.
 - Deployed as a self-contained HTML deck on GitHub Pages.
 - All metrics are calculated dynamically from the source data at render time.
 
+This type of interactive sales analysis is a standard business deliverable, commonly produced in Python or BI tools like Tableau. Built in R as part of [JHU's Developing Data Products course](https://www.coursera.org/learn/data-products), it demonstrates the same workflow: live data pipeline, interactive visualization, and a self-contained deployed output.
+
 ---
 
 ## Data 
