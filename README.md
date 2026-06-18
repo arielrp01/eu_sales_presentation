@@ -2,26 +2,6 @@
 
 An end-to-end interactive sales analysis.
 
-- Built on a live data pipeline from Google Sheets, with interactive Leaflet maps and Plotly charts.
-- Deployed as a self-contained slide deck on GitHub Pages.
-- All metrics and analysis are generated dynamically from the source data at render time and verified for accuracy.
-
-This type of analysis is a standard business deliverable, commonly produced in Python or BI tools like Tableau. Built in R as part of [JHU's Developing Data Products course](https://www.coursera.org/learn/data-products), it demonstrates the same workflow: live data pipeline, interactive visualization, and a single deployable data product.
-
----
-
-## Data 
-
-[EU Superstore dataset](https://public.tableau.com/app/sample-data/sample_-_superstore.xls)
-
----
-
-## Requirements
-- R 4.0+
-- RStudio (recommended)
-- The following R packages (auto-installed on first run):
-  `tidyverse`, `lubridate`, `janitor`, `googlesheets4`, `plotly`, `scales`, `leaflet`, `sf`, `rnaturalearth`, `rnaturalearthdata`, `htmltools`
-
 ---
 
 ## Built With
