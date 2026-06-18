@@ -1,12 +1,12 @@
 # EU Sales Presentation
 
-An end-to-end interactive presentation analyzing EU sales data.
+An end-to-end interactive interactive sales analysis.
 
 - Built on a live data pipeline from Google Sheets, with interactive Leaflet maps and Plotly charts.
-- Deployed as a self-contained HTML deck on GitHub Pages.
-- All metrics are calculated dynamically from the source data at render time.
+- Deployed as a self-contained slide deck on GitHub Pages.
+- All metrics and analysis are generated dynamically from the source data at render time and verified for accuracy.
 
-This type of interactive sales analysis is a standard business deliverable, commonly produced in Python or BI tools like Tableau. Built in R as part of [JHU's Developing Data Products course](https://www.coursera.org/learn/data-products), it demonstrates the same workflow: live data pipeline, interactive visualization, and a self-contained deployed output.
+This type of analysis is a standard business deliverable, commonly produced in Python or BI tools like Tableau. Built in R as part of [JHU's Developing Data Products course](https://www.coursera.org/learn/data-products), it demonstrates the same workflow: live data pipeline, interactive visualization, and a single deployable data product.
 
 ---
 
