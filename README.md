@@ -1,6 +1,6 @@
 # EU Sales Presentation
 
-An end-to-end interactive interactive sales analysis.
+An end-to-end interactive sales analysis.
 
 - Built on a live data pipeline from Google Sheets, with interactive Leaflet maps and Plotly charts.
 - Deployed as a self-contained slide deck on GitHub Pages.
